@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@lunchfirm/pentool": "^0.1.0"
+    "@lunchfirm/pentool": "^0.1.5"
   },
   "devDependencies": {
     "vite": "^6.0.0"

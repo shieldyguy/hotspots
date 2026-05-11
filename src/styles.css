@@ -32,14 +32,14 @@
   --shadow: 0 24px 56px -28px rgba(0, 0, 0, 0.7);
 }
 
-/* Pen-tool overrides — derived from the theme above */
+/* Pen-tool overrides — fall back to theme ink when no --pen-color is set */
 :root {
-  --pt-path-stroke: var(--ink);
-  --pt-anchor-fill: var(--ink);
+  --pt-path-stroke: var(--pen-color, var(--ink));
+  --pt-anchor-fill: var(--pen-color, var(--ink));
   --pt-anchor-stroke: transparent;
   --pt-handle-fill: var(--paper);
-  --pt-handle-stroke: var(--ink-dim);
-  --pt-handle-line: var(--ink-mute);
+  --pt-handle-stroke: var(--pen-color, var(--ink-dim));
+  --pt-handle-line: var(--pen-color, var(--ink-mute));
   --pt-close-hint: var(--accent);
   --pt-mode-bg: var(--paper);
   --pt-mode-fg: var(--ink);
@@ -134,6 +134,78 @@ h1 {
 .theme-divider {
   color: var(--ink-mute);
   font-size: 14px;
+}
+
+/* ── Pen color picker ────────────────────────────────────── */
+.pen-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 14px 0 6px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border-faint);
+}
+
+.pen-color-label {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-right: 4px;
+}
+
+.pen-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--swatch, transparent);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.pen-swatch[data-pen-color=""] {
+  background: linear-gradient(135deg, var(--ink) 0 50%, var(--paper) 50% 100%);
+}
+
+.pen-swatch:hover:not(.active) {
+  transform: scale(1.15);
+}
+
+.pen-swatch.active {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--ink-strong);
+}
+
+.pen-custom-wrap {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  overflow: hidden;
+  background: conic-gradient(
+    from 0deg,
+    #ff0000,
+    #ffff00,
+    #00ff00,
+    #00ffff,
+    #0000ff,
+    #ff00ff,
+    #ff0000
+  );
+  transition: transform 0.12s;
+}
+
+.pen-custom-wrap:hover { transform: scale(1.15); }
+
+.pen-custom {
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 
 .load-btn { display: inline-block; }
@@ -360,10 +432,9 @@ aside h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
   background: var(--bg);
   position: relative;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .stage.dropping::after {
@@ -372,6 +443,7 @@ aside h2 {
   inset: 16px;
   border: 1px dashed var(--accent);
   pointer-events: none;
+  z-index: 60;
 }
 
 .drop-zone {
@@ -405,23 +477,33 @@ aside h2 {
 }
 
 .image-wrap {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
   line-height: 0;
   background: var(--paper);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  max-width: 100%;
-  max-height: 100%;
 }
 
 .image-wrap img {
   display: block;
-  max-width: 100%;
-  max-height: calc(100vh - 200px);
-  height: auto;
   user-select: none;
   -webkit-user-drag: none;
 }
+
+.pan-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  cursor: grab;
+  display: none;
+  background: transparent;
+}
+
+.pan-shield.active { display: block; }
+.pan-shield.dragging { cursor: grabbing; }
 
 /* ── Status ─────────────────────────────────────────────── */
 .status {
@@ -445,6 +527,14 @@ aside h2 {
 .status-hints {
   color: var(--ink-mute);
   font-size: 12px;
+}
+
+.status-zoom {
+  margin-left: auto;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--ink-mute);
+  letter-spacing: 0.05em;
 }
 
 .status-hints kbd {

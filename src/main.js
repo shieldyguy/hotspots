@@ -20,6 +20,37 @@ document.querySelectorAll(".theme-btn").forEach((b) => {
 });
 syncThemeButtons();
 
+// ── Pen color ────────────────────────────────────────────
+function setPenColor(color) {
+  if (color) {
+    document.documentElement.style.setProperty("--pen-color", color);
+  } else {
+    document.documentElement.style.removeProperty("--pen-color");
+  }
+  localStorage.setItem("hotspot-pen-color", color);
+  syncPenSwatches(color);
+}
+
+function syncPenSwatches(active) {
+  document.querySelectorAll(".pen-swatch").forEach((b) => {
+    b.classList.toggle("active", b.dataset.penColor === active);
+  });
+}
+
+document.querySelectorAll(".pen-swatch").forEach((b) => {
+  b.addEventListener("click", () => setPenColor(b.dataset.penColor));
+});
+
+const penCustom = document.getElementById("pen-custom");
+penCustom.addEventListener("input", (e) => {
+  // Custom color: clear preset highlights — this is its own kind of active
+  setPenColor(e.target.value);
+});
+
+const savedPen = localStorage.getItem("hotspot-pen-color");
+if (savedPen != null) setPenColor(savedPen);
+else syncPenSwatches("");
+
 // ── State ────────────────────────────────────────────────
 const state = {
   image: null,
@@ -37,7 +68,132 @@ const el = {
   status: document.getElementById("status"),
   statusMode: document.getElementById("status-mode"),
   statusHints: document.getElementById("status-hints"),
+  statusZoom: document.getElementById("status-zoom"),
 };
+
+// ── Zoom / pan ────────────────────────────────────────────
+const view = { zoom: 1, panX: 0, panY: 0 };
+let imageWrap = null;
+let panShield = null;
+let spaceHeld = false;
+let panning = false;
+let panStart = null;
+
+function applyTransform() {
+  if (imageWrap) {
+    imageWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
+  }
+  if (el.statusZoom) {
+    el.statusZoom.textContent = `${Math.round(view.zoom * 100)}%`;
+  }
+}
+
+function fitImageToStage() {
+  if (!state.image || !imageWrap) return;
+  const stageRect = el.stage.getBoundingClientRect();
+  const margin = 64;
+  const fitZoom = Math.min(
+    (stageRect.width - margin * 2) / state.image.width,
+    (stageRect.height - margin * 2) / state.image.height,
+    1,
+  );
+  view.zoom = fitZoom;
+  view.panX = (stageRect.width - state.image.width * fitZoom) / 2;
+  view.panY = (stageRect.height - state.image.height * fitZoom) / 2;
+  applyTransform();
+}
+
+function zoomTo(newZoom, cursorX, cursorY) {
+  if (!state.image) return;
+  newZoom = Math.max(0.1, Math.min(10, newZoom));
+  const stageRect = el.stage.getBoundingClientRect();
+  const localX = cursorX - stageRect.left;
+  const localY = cursorY - stageRect.top;
+  const imgX = (localX - view.panX) / view.zoom;
+  const imgY = (localY - view.panY) / view.zoom;
+  view.panX = localX - imgX * newZoom;
+  view.panY = localY - imgY * newZoom;
+  view.zoom = newZoom;
+  applyTransform();
+}
+
+function centerAtCurrentZoom() {
+  if (!state.image) return;
+  const stageRect = el.stage.getBoundingClientRect();
+  view.panX = (stageRect.width - state.image.width * view.zoom) / 2;
+  view.panY = (stageRect.height - state.image.height * view.zoom) / 2;
+  applyTransform();
+}
+
+function isTypingTarget(e) {
+  const t = e.target;
+  return (
+    t &&
+    (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
+  );
+}
+
+document.addEventListener(
+  "wheel",
+  (e) => {
+    if (!state.image) return;
+    const stageRect = el.stage.getBoundingClientRect();
+    if (
+      e.clientX < stageRect.left ||
+      e.clientX > stageRect.right ||
+      e.clientY < stageRect.top ||
+      e.clientY > stageRect.bottom
+    )
+      return;
+
+    if (e.ctrlKey || e.metaKey) {
+      // ⌘/Ctrl + scroll (and Mac trackpad pinch) → zoom toward cursor
+      e.preventDefault();
+      const factor = Math.exp(-e.deltaY * 0.01);
+      zoomTo(view.zoom * factor, e.clientX, e.clientY);
+    } else {
+      // Plain scroll / two-finger trackpad → pan
+      e.preventDefault();
+      view.panX -= e.deltaX;
+      view.panY -= e.deltaY;
+      applyTransform();
+    }
+  },
+  { passive: false },
+);
+
+document.addEventListener("keydown", (e) => {
+  if (isTypingTarget(e)) return;
+
+  if (e.code === "Space") {
+    if (e.repeat) return;
+    e.preventDefault();
+    spaceHeld = true;
+    if (panShield) panShield.classList.add("active");
+    return;
+  }
+
+  if ((e.metaKey || e.ctrlKey) && e.key === "0" && state.image) {
+    e.preventDefault();
+    fitImageToStage();
+    return;
+  }
+
+  if ((e.metaKey || e.ctrlKey) && e.key === "1" && state.image) {
+    e.preventDefault();
+    view.zoom = 1;
+    centerAtCurrentZoom();
+    return;
+  }
+});
+
+document.addEventListener("keyup", (e) => {
+  if (e.code === "Space") {
+    spaceHeld = false;
+    panning = false;
+    if (panShield) panShield.classList.remove("active", "dragging");
+  }
+});
 
 // ── Image loading ────────────────────────────────────────
 el.file.addEventListener("change", (e) => {
@@ -100,8 +256,43 @@ function mountImage(image) {
 
   const img = document.createElement("img");
   img.src = image.src;
+  img.width = image.width;
+  img.height = image.height;
   wrap.appendChild(img);
   el.stage.appendChild(wrap);
+
+  imageWrap = wrap;
+
+  panShield = document.createElement("div");
+  panShield.className = "pan-shield";
+  if (spaceHeld) panShield.classList.add("active");
+  panShield.addEventListener("pointerdown", (e) => {
+    if (!spaceHeld) return;
+    e.preventDefault();
+    panning = true;
+    panStart = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      panX: view.panX,
+      panY: view.panY,
+    };
+    panShield.classList.add("dragging");
+    panShield.setPointerCapture(e.pointerId);
+  });
+  panShield.addEventListener("pointermove", (e) => {
+    if (!panning) return;
+    view.panX = panStart.panX + (e.clientX - panStart.clientX);
+    view.panY = panStart.panY + (e.clientY - panStart.clientY);
+    applyTransform();
+  });
+  panShield.addEventListener("pointerup", (e) => {
+    panning = false;
+    panShield.classList.remove("dragging");
+    if (panShield.hasPointerCapture(e.pointerId)) {
+      panShield.releasePointerCapture(e.pointerId);
+    }
+  });
+  el.stage.appendChild(panShield);
 
   state.pen = new PenTool(wrap, { viewBox: [image.width, image.height] });
   state.pen.on("path", onPath);
@@ -111,6 +302,8 @@ function mountImage(image) {
   el.newRegion.disabled = false;
   el.exportBtn.disabled = state.regions.length === 0;
   el.status.hidden = false;
+
+  fitImageToStage();
 
   if (state.regions.length === 0) {
     state.activeId = null;

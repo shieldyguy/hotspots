@@ -3,11 +3,90 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hotspot Editor</title>
+    <!-- BEGIN LUNCH PACKAGING -->
+    <!-- Lunch Packaging: Hotspots -->
+
+    <!-- Primary Meta -->
+    <title>Hotspots by Lunch</title>
     <meta
       name="description"
       content="Trace, tag, and export interactive image hotspots."
     />
+    <meta name="author" content="Chris McDowell" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://hotspots.lunchfirm.com" />
+    <meta property="og:title" content="Hotspots by Lunch" />
+    <meta
+      property="og:description"
+      content="Trace, tag, and export interactive image hotspots."
+    />
+    <meta
+      property="og:image"
+      content="https://hotspots.lunchfirm.com/packaging/og/og-image.png"
+    />
+    <meta property="og:image:width" content="1841" />
+    <meta property="og:image:height" content="1082" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Hotspots by Lunch" />
+    <meta
+      name="twitter:description"
+      content="Trace, tag, and export interactive image hotspots."
+    />
+    <meta
+      name="twitter:image"
+      content="https://hotspots.lunchfirm.com/packaging/og/og-image.png"
+    />
+
+    <!-- Fonts (Adobe/Typekit) -->
+    <link rel="stylesheet" href="https://use.typekit.net/ubs4dtx.css" />
+
+    <!-- Favicons -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/packaging/favicons/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/packaging/favicons/favicon-16x16.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/packaging/favicons/apple-touch-icon.png"
+    />
+    <link rel="shortcut icon" href="/packaging/favicons/favicon.ico" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Hotspots",
+        "description": "Trace, tag, and export interactive image hotspots.",
+        "url": "https://hotspots.lunchfirm.com",
+        "author": {
+          "@type": "Person",
+          "name": "Chris McDowell",
+          "url": "https://lunchfirm.com"
+        },
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Web",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
+    <!-- END LUNCH PACKAGING -->
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -19,6 +98,42 @@
           <button class="theme-btn" data-set-theme="light">Day</button>
           <span class="theme-divider">·</span>
           <button class="theme-btn" data-set-theme="dark">Night</button>
+        </div>
+
+        <div class="pen-color" id="pen-color">
+          <span class="pen-color-label">pen</span>
+          <button
+            class="pen-swatch"
+            data-pen-color=""
+            title="Auto (follows theme)"
+          ></button>
+          <button
+            class="pen-swatch"
+            data-pen-color="#ffffff"
+            title="White"
+            style="--swatch: #ffffff"
+          ></button>
+          <button
+            class="pen-swatch"
+            data-pen-color="#ff2e88"
+            title="Hot pink"
+            style="--swatch: #ff2e88"
+          ></button>
+          <button
+            class="pen-swatch"
+            data-pen-color="#00d4e0"
+            title="Cyan"
+            style="--swatch: #00d4e0"
+          ></button>
+          <button
+            class="pen-swatch"
+            data-pen-color="#f5d442"
+            title="Yellow"
+            style="--swatch: #f5d442"
+          ></button>
+          <label class="pen-custom-wrap" title="Custom color">
+            <input type="color" id="pen-custom" class="pen-custom" />
+          </label>
         </div>
 
         <label class="load-btn" for="file">Load image</label>
@@ -39,7 +154,7 @@
       <div class="stage" id="stage">
         <div class="drop-zone">
           <h3>Drop an image to start.</h3>
-          <p>Anywhere on this page — or use <em>Load image</em>.</p>
+          <p>Anywhere on this page or use <em>Load image</em>.</p>
           <div class="rule"></div>
           <p>
             Trace regions with the pen tool, name them, and export a
@@ -51,6 +166,7 @@
       <div class="status" id="status" hidden>
         <em id="status-mode">Drawing new</em>
         <span class="status-hints" id="status-hints"></span>
+        <span class="status-zoom" id="status-zoom">100%</span>
       </div>
     </main>
 
