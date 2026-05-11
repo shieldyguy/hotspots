@@ -1,0 +1,18 @@
+{
+  "name": "hotspots",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Trace, tag, and export interactive image hotspots.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@lunchfirm/pentool": "^0.1.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
