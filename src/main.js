@@ -43,7 +43,7 @@ document.querySelectorAll(".pen-swatch").forEach((b) => {
 
 const penCustom = document.getElementById("pen-custom");
 penCustom.addEventListener("input", (e) => {
-  // Custom color: clear preset highlights — this is its own kind of active
+  // Custom color: clear preset highlights  -  this is its own kind of active
   setPenColor(e.target.value);
 });
 
@@ -58,6 +58,20 @@ const state = {
   activeId: null,
   pen: null,
 };
+
+// Default fill/stroke colors handed to new regions, cycled by creation order.
+const REGION_COLORS = [
+  "#ff2e88",
+  "#00d4e0",
+  "#f5d442",
+  "#7c5cff",
+  "#3ddc84",
+  "#ff8a3d",
+];
+const DEFAULT_REGION_COLOR = REGION_COLORS[0];
+function nextRegionColor() {
+  return REGION_COLORS[state.regions.length % REGION_COLORS.length];
+}
 
 const el = {
   file: document.getElementById("file"),
@@ -74,6 +88,8 @@ const el = {
 // ── Zoom / pan ────────────────────────────────────────────
 const view = { zoom: 1, panX: 0, panY: 0 };
 let imageWrap = null;
+let regionsOverlay = null;
+const SVGNS = "http://www.w3.org/2000/svg";
 let panShield = null;
 let spaceHeld = false;
 let panning = false;
@@ -170,6 +186,13 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     spaceHeld = true;
     if (panShield) panShield.classList.add("active");
+    return;
+  }
+
+  // Escape deselects the active region (the pen tool leaves closed paths
+  // alone on Escape, so this is a no-op when nothing is selected).
+  if (e.key === "Escape" && state.activeId != null) {
+    deselect();
     return;
   }
 
@@ -299,6 +322,15 @@ function mountImage(image) {
   state.pen.on("update", onUpdate);
   state.pen.on("cancel", onCancel);
 
+  // Persistent layer for closed regions, mounted above the pen overlay.
+  // The <svg> itself ignores pointer events; only the region shapes opt in,
+  // so empty areas fall through to the pen tool for drawing.
+  regionsOverlay = document.createElementNS(SVGNS, "svg");
+  regionsOverlay.setAttribute("viewBox", `0 0 ${image.width} ${image.height}`);
+  regionsOverlay.setAttribute("preserveAspectRatio", "none");
+  regionsOverlay.classList.add("regions-overlay");
+  wrap.appendChild(regionsOverlay);
+
   el.newRegion.disabled = false;
   el.exportBtn.disabled = state.regions.length === 0;
   el.status.hidden = false;
@@ -312,6 +344,7 @@ function mountImage(image) {
     if (r) state.pen.load({ points: r.points, closed: r.closed });
   }
   renderRegions();
+  renderOverlay();
   updateStatus();
 }
 
@@ -323,11 +356,20 @@ function onPath(path) {
       id,
       name: `Region ${state.regions.length + 1}`,
       href: "",
+      color: nextRegionColor(),
       data: [],
       points: path.points,
       closed: path.closed,
     });
-    state.activeId = id;
+    // QoL: a freshly closed shape drops back to "new region" mode so the
+    // next click starts another region  -  no need to hit "New region" first.
+    // It now lives in the overlay; click it (or its list row) to edit again.
+    if (path.closed) {
+      state.activeId = null;
+      state.pen.clear();
+    } else {
+      state.activeId = id;
+    }
   } else {
     const r = state.regions.find((r) => r.id === state.activeId);
     if (r) {
@@ -337,6 +379,7 @@ function onPath(path) {
   }
   el.exportBtn.disabled = state.regions.length === 0;
   renderRegions();
+  renderOverlay();
   updateStatus();
 }
 
@@ -353,12 +396,22 @@ function onCancel() {
   updateStatus();
 }
 
+// Click away (empty stage / image background) deselects. Region shapes
+// stopPropagation, so they never reach here; a pen anchor/handle grab sets
+// dragState, which we honor so editing isn't interrupted.
+el.stage.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || spaceHeld) return;
+  if (state.activeId == null || state.pen?.dragState) return;
+  deselect();
+});
+
 // ── Region list UI ───────────────────────────────────────
 el.newRegion.addEventListener("click", () => {
   if (!state.pen) return;
   state.activeId = null;
   state.pen.clear();
   renderRegions();
+  renderOverlay();
   updateStatus();
 });
 
@@ -369,6 +422,18 @@ function selectRegion(id) {
   const r = state.regions.find((r) => r.id === id);
   if (r) state.pen.load({ points: r.points, closed: r.closed });
   renderRegions();
+  renderOverlay();
+  updateStatus();
+}
+
+// Drop back to "new region" / idle mode, returning the active shape to the
+// overlay. Used by Escape and click-away.
+function deselect() {
+  if (!state.pen || state.activeId == null) return;
+  state.activeId = null;
+  state.pen.clear();
+  renderRegions();
+  renderOverlay();
   updateStatus();
 }
 
@@ -380,7 +445,29 @@ function deleteRegion(id) {
   }
   el.exportBtn.disabled = state.regions.length === 0;
   renderRegions();
+  renderOverlay();
   updateStatus();
+}
+
+// ── Closed-region overlay ────────────────────────────────
+// Rebuild the persistent shapes for every closed region except the active
+// one  -  that one is owned by the pen tool. Shapes are mostly transparent,
+// brighten on hover, and click-to-select for editing.
+function renderOverlay() {
+  if (!regionsOverlay) return;
+  regionsOverlay.innerHTML = "";
+  for (const r of state.regions) {
+    if (!r.closed || r.id === state.activeId) continue;
+    const shape = document.createElementNS(SVGNS, "path");
+    shape.setAttribute("class", "region-shape");
+    shape.setAttribute("d", pointsToDString(r.points, r.closed));
+    shape.style.setProperty("--region-color", r.color || DEFAULT_REGION_COLOR);
+    shape.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      selectRegion(r.id);
+    });
+    regionsOverlay.appendChild(shape);
+  }
 }
 
 function renderDataRow(region, pair, index) {
@@ -438,11 +525,31 @@ function renderRegions() {
       selectRegion(r.id);
     });
 
+    const head = document.createElement("div");
+    head.className = "region-head";
+
+    const colorWrap = document.createElement("label");
+    colorWrap.className = "region-color-wrap";
+    colorWrap.title = "Region color";
+    const color = document.createElement("input");
+    color.type = "color";
+    color.className = "region-color";
+    color.value = r.color || DEFAULT_REGION_COLOR;
+    colorWrap.style.setProperty("--region-color", color.value);
+    color.addEventListener("input", (e) => {
+      r.color = e.target.value;
+      colorWrap.style.setProperty("--region-color", e.target.value);
+      renderOverlay();
+    });
+    colorWrap.appendChild(color);
+    head.appendChild(colorWrap);
+
     const name = document.createElement("input");
     name.className = "region-name";
     name.value = r.name;
     name.addEventListener("input", (e) => { r.name = e.target.value; });
-    li.appendChild(name);
+    head.appendChild(name);
+    li.appendChild(head);
 
     const href = document.createElement("input");
     href.className = "region-href";
@@ -502,7 +609,7 @@ function updateStatus() {
       'click to place, <kbd>click + drag</kbd> for a curve, click the first anchor to close';
   } else {
     const r = state.regions.find((r) => r.id === state.activeId);
-    el.statusMode.textContent = `Editing — ${r?.name ?? ""}`;
+    el.statusMode.textContent = `Editing  -  ${r?.name ?? ""}`;
     el.statusHints.innerHTML =
       'drag anchors and handles, <kbd>Alt</kbd>-click for smooth/corner, <kbd>+</kbd> add, <kbd>−</kbd> remove';
   }
@@ -537,7 +644,7 @@ function exportHTML() {
   if (!state.image || state.regions.length === 0) return;
   const { src, width, height, filename } = state.image;
   const baseName = (filename || "image").replace(/\.[^.]+$/, "");
-  const title = `${baseName} — hotspots`;
+  const title = `${baseName}  -  hotspots`;
 
   const paths = state.regions
     .map((r) => {
@@ -562,7 +669,7 @@ function exportHTML() {
 
   const html = `<!doctype html>
 <!--
-  HOTSPOTS — exported from the Hotspot Editor (pentool.js)
+  HOTSPOTS  -  exported from the Hotspot Editor (pentool.js)
   Source image: ${escapeAttr(filename || "untitled")}  (${width} × ${height})
 
   HOW TO USE THIS FILE
@@ -580,13 +687,13 @@ function exportHTML() {
 
   EACH HOTSPOT
   ────────────
-  data-name  — shown in the hover label
-  data-href  — optional. If present, click navigates there.
-  data-{key} — any custom region data you set in the editor becomes a
+  data-name   -  shown in the hover label
+  data-href   -  optional. If present, click navigates there.
+  data-{key}  -  any custom region data you set in the editor becomes a
                data-* attribute here. Read in JS via el.dataset.{key},
                or target with CSS: [data-{key}="value"].
                For tag-like behavior, use a "tags" key with
-               space-separated values — e.g. data-tags="nav primary",
+               space-separated values  -  e.g. data-tags="nav primary",
                then match with [data-tags~="nav"] in CSS, or
                el.dataset.tags.split(" ").includes("nav") in JS.
 

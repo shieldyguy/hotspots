@@ -32,7 +32,7 @@
   --shadow: 0 24px 56px -28px rgba(0, 0, 0, 0.7);
 }
 
-/* Pen-tool overrides — fall back to theme ink when no --pen-color is set */
+/* Pen-tool overrides  -  fall back to theme ink when no --pen-color is set */
 :root {
   --pt-path-stroke: var(--pen-color, var(--ink));
   --pt-anchor-fill: var(--pen-color, var(--ink));
@@ -279,6 +279,41 @@ aside h2 {
 
 .region.active::before { opacity: 1; }
 
+.region-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.region-color-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--region-color, var(--accent));
+  border: 1px solid var(--border);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.12s;
+}
+
+.region-color-wrap:hover {
+  transform: scale(1.15);
+}
+
+.region-color {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  padding: 0;
+  border: none;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .region-name {
   font-family: inherit;
   font-size: 16px;
@@ -491,6 +526,35 @@ aside h2 {
   display: block;
   user-select: none;
   -webkit-user-drag: none;
+}
+
+/* ── Closed-region overlay ──────────────────────────────── */
+/* The SVG ignores pointer events so empty space falls through to the pen
+   tool; individual shapes opt back in for hover + click-to-select. */
+.regions-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.region-shape {
+  fill: var(--region-color, var(--accent));
+  fill-opacity: 0.12;
+  stroke: var(--region-color, var(--accent));
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: fill-opacity 0.15s, stroke-opacity 0.15s;
+}
+
+.region-shape:hover {
+  fill-opacity: 0.28;
+  stroke-opacity: 0.9;
 }
 
 .pan-shield {
